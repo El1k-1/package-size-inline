@@ -3,7 +3,7 @@
   "displayName": "Package Size Inline",
   "description": "Shows package sizes (weight) inline next to dependencies in package.json",
   "version": "0.1.0",
-  "publisher": "local",
+  "publisher": "El1k-1",
   "engines": {
     "vscode": "^1.74.0"
   },
