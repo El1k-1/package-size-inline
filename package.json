@@ -4,6 +4,11 @@
   "description": "Shows package sizes (weight) inline next to dependencies in package.json",
   "version": "0.1.1",
   "publisher": "El1k-1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/El1k-1/package-size-inline.git"
+  },
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -30,7 +35,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "buildvsix": "vsce"
+    "buildvsix": "vsce package"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
