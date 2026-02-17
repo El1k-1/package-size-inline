@@ -2,7 +2,7 @@
   "name": "package-size-inline",
   "displayName": "Package Size Inline",
   "description": "Shows package sizes (weight) inline next to dependencies in package.json",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "El1k-1",
   "repository": {
     "type": "git",
@@ -25,10 +25,6 @@
     "inline"
   ],
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/El1k-1/package-size-inline.git"
-  },
   "homepage": "https://github.com/El1k-1/package-size-inline#readme",
   "bugs": {
     "url": "https://github.com/El1k-1/package-size-inline/issues"
