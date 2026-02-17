@@ -15,6 +15,24 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "package",
+    "size",
+    "npm",
+    "dependencies",
+    "bundle",
+    "weight",
+    "inline"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/El1k-1/package-size-inline.git"
+  },
+  "homepage": "https://github.com/El1k-1/package-size-inline#readme",
+  "bugs": {
+    "url": "https://github.com/El1k-1/package-size-inline/issues"
+  },
   "activationEvents": [
     "onLanguage:json"
   ],

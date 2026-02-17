@@ -10,6 +10,20 @@ Sizes are fetched from the **npm Registry** (`unpackedSize`). For `file:` depend
 
 Inline annotations (e.g. **5.6 MB**, **81.6 kB**) appear next to each package version.
 
+## Installation
+
+### From Open VSX Registry
+```bash
+ovsx install El1k-1.package-size-inline
+```
+
+### From VS Code Marketplace
+Search for "Package Size Inline" in VS Code Extensions marketplace.
+
+### Manual Installation
+1. Download the `.vsix` file from [Releases](https://github.com/YOUR_USERNAME/package-size-inline/releases)
+2. In VS Code: **Extensions** → **...** → **Install from VSIX**
+
 ## How to use
 
 1. Install the extension (or run from folder via **Run and Debug**).
