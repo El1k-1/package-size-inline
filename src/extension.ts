@@ -44,7 +44,7 @@ function getDecorationType(sizeText: string, context: vscode.ExtensionContext): 
   if (!type) {
     type = vscode.window.createTextEditorDecorationType({
       after: {
-        contentText: `  📦 ${sizeText}`,
+        contentText: `  ${sizeText}`,
         color: new vscode.ThemeColor('descriptionForeground'),
         margin: '0 0 0 1em',
       },
