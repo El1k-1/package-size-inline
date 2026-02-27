@@ -1,12 +1,21 @@
 # Package Size Inline
 
-A VS Code extension that shows **package sizes** (in kB/MB) inline next to each dependency in `package.json` under `dependencies` and `devDependencies`.
+A VS Code extension that shows **package/module sizes** (in kB/MB) inline next to dependencies in:
 
-Sizes are fetched from the **npm Registry** (`unpackedSize`). For `file:` dependencies, the size shown is the size of the package as installed in `node_modules` (built/minified output).
+- `package.json` (`dependencies` and `devDependencies`)
+- `go.mod`
+
+For `package.json`, sizes are fetched from the **npm Registry** (`unpackedSize`). For `file:` dependencies, the size shown is the size of the package as installed in `node_modules` (built/minified output).
+
+For `go.mod`, sizes are fetched from the **Go module proxy** archive size for each module version.
 
 ## Example
 
 ![Package size inline example](images/usage.png)
+
+go.mod example
+
+![Package size inline example](images/usage_go.png)
 
 Inline annotations (e.g. **5.6 MB**, **81.6 kB**) appear next to each package version.
 
@@ -27,8 +36,8 @@ Search for "Package Size Inline" in VS Code Extensions marketplace.
 ## How to use
 
 1. Install the extension (or run from folder via **Run and Debug**).
-2. Open any `package.json`.
-3. Each dependency line will show a label like `📦 12.5 kB` to the right (or `—` if the size could not be determined).
+2. Open `package.json` or `go.mod`.
+3. Each dependency/module line will show a label like `12.5 kB` to the right (or `—` if the size could not be determined).
 
 ## Settings
 
@@ -42,7 +51,7 @@ npm install
 npm run compile
 ```
 
-In VS Code: **Run and Debug** → **Run Extension**. A new window opens with the extension loaded; open any `package.json` there.
+In VS Code: **Run and Debug** → **Run Extension**. A new window opens with the extension loaded; open `package.json` or `go.mod` there.
 
 ## Packaging .vsix
 

@@ -6,13 +6,22 @@ const vscode = require("vscode");
 const path = require("path");
 const fs = require("fs/promises");
 const PACKAGE_JSON = 'package.json';
+const GO_MOD = 'go.mod';
 const FILE_PROTOCOL = 'file:';
 const NPM_REGISTRY = 'https://registry.npmjs.org';
+const GO_PROXY = 'https://proxy.golang.org';
 const sizeCache = new Map();
 const decorationTypeCache = new Map();
 function isPackageJson(doc) {
     const path = doc.uri.fsPath.toLowerCase();
     return path.endsWith(PACKAGE_JSON) || doc.fileName.toLowerCase() === PACKAGE_JSON;
+}
+function isGoMod(doc) {
+    const filePath = doc.uri.fsPath.toLowerCase();
+    return filePath.endsWith(GO_MOD) || doc.fileName.toLowerCase() === GO_MOD;
+}
+function isSupportedDependencyFile(doc) {
+    return isPackageJson(doc) || isGoMod(doc);
 }
 function formatBytes(bytes) {
     if (bytes >= 1024 * 1024) {
@@ -39,6 +48,9 @@ function getDecorationType(sizeText, context) {
     return type;
 }
 function parseDepsFromDocument(doc) {
+    if (isGoMod(doc)) {
+        return { deps: parseGoModDeps(doc), devDeps: [] };
+    }
     const text = doc.getText();
     const deps = [];
     const devDeps = [];
@@ -75,6 +87,48 @@ function parseDepsFromDocument(doc) {
         // invalid JSON
     }
     return { deps, devDeps };
+}
+function parseGoModDeps(doc) {
+    const deps = [];
+    const lines = doc.getText().split(/\r?\n/);
+    const goModLineRe = /^([^\s]+)\s+(v[^\s]+)(?:\s+\/\/.*)?$/;
+    const singleRequireLineRe = /^require\s+([^\s]+)\s+(v[^\s]+)(?:\s+\/\/.*)?$/;
+    let inRequireBlock = false;
+    for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const line = rawLine.trim();
+        if (!line ||
+            line.startsWith('//') ||
+            line.startsWith('module ') ||
+            line.startsWith('go ') ||
+            line.startsWith('toolchain ') ||
+            line.startsWith('replace ') ||
+            line.startsWith('exclude ') ||
+            line.startsWith('retract ')) {
+            continue;
+        }
+        if (line.startsWith('require (')) {
+            inRequireBlock = true;
+            continue;
+        }
+        if (inRequireBlock && line === ')') {
+            inRequireBlock = false;
+            continue;
+        }
+        const match = inRequireBlock ? goModLineRe.exec(line) : singleRequireLineRe.exec(line);
+        if (!match)
+            continue;
+        const moduleName = match[1];
+        const rawVersion = match[2];
+        const version = rawVersion.endsWith('/go.mod') ? rawVersion.slice(0, -'/go.mod'.length) : rawVersion;
+        const lineEnd = doc.lineAt(i).range.end;
+        deps.push({
+            name: moduleName,
+            version,
+            range: new vscode.Range(lineEnd, lineEnd),
+        });
+    }
+    return deps;
 }
 function parsePackageSpec(spec) {
     const at = spec.indexOf('@', 1);
@@ -194,11 +248,77 @@ async function fetchSize(packageSpec) {
         return '—';
     }
 }
+function escapeGoProxyPathSegment(segment) {
+    return segment.replace(/[A-Z]/g, (char) => `!${char.toLowerCase()}`);
+}
+function toGoProxyModulePath(modulePath) {
+    return modulePath
+        .split('/')
+        .map((segment) => encodeURIComponent(escapeGoProxyPathSegment(segment)))
+        .join('/');
+}
+async function fetchGoModuleSize(modulePath, version) {
+    const cacheKey = `go:${modulePath}@${version}`;
+    const cached = sizeCache.get(cacheKey);
+    if (cached !== undefined)
+        return cached;
+    if (!modulePath || !version) {
+        sizeCache.set(cacheKey, '—');
+        return '—';
+    }
+    const url = `${GO_PROXY}/${toGoProxyModulePath(modulePath)}/@v/${encodeURIComponent(version)}.zip`;
+    try {
+        const headRes = await fetch(url, { method: 'HEAD' });
+        if (headRes.ok) {
+            const len = headRes.headers.get('content-length');
+            if (len) {
+                const bytes = Number.parseInt(len, 10);
+                if (Number.isFinite(bytes)) {
+                    const text = formatBytes(bytes);
+                    sizeCache.set(cacheKey, text);
+                    return text;
+                }
+            }
+        }
+        const rangeRes = await fetch(url, { headers: { Range: 'bytes=0-0' } });
+        if (!rangeRes.ok) {
+            sizeCache.set(cacheKey, '—');
+            return '—';
+        }
+        const contentRange = rangeRes.headers.get('content-range');
+        if (contentRange) {
+            const match = /\/(\d+)$/.exec(contentRange);
+            if (match) {
+                const bytes = Number.parseInt(match[1], 10);
+                if (Number.isFinite(bytes)) {
+                    const text = formatBytes(bytes);
+                    sizeCache.set(cacheKey, text);
+                    return text;
+                }
+            }
+        }
+        const len = rangeRes.headers.get('content-length');
+        if (len) {
+            const bytes = Number.parseInt(len, 10);
+            if (Number.isFinite(bytes)) {
+                const text = formatBytes(bytes);
+                sizeCache.set(cacheKey, text);
+                return text;
+            }
+        }
+        sizeCache.set(cacheKey, '—');
+        return '—';
+    }
+    catch {
+        sizeCache.set(cacheKey, '—');
+        return '—';
+    }
+}
 async function updateDecorations(editor, context) {
     const config = vscode.workspace.getConfiguration('packageSizeInline');
     if (!config.get('enabled', true))
         return;
-    if (!isPackageJson(editor.document))
+    if (!isSupportedDependencyFile(editor.document))
         return;
     const { deps, devDeps } = parseDepsFromDocument(editor.document);
     const all = [...deps, ...devDeps];
@@ -206,6 +326,9 @@ async function updateDecorations(editor, context) {
         return;
     const docDir = path.dirname(editor.document.uri.fsPath);
     const sizes = await Promise.all(all.map((d) => {
+        if (isGoMod(editor.document)) {
+            return fetchGoModuleSize(d.name, d.version);
+        }
         if (isFileDependency(d.version)) {
             return getNodeModulesPackageSize(docDir, d.name);
         }
@@ -245,7 +368,7 @@ function activate(context) {
         }
         if (!editor)
             return;
-        if (!isPackageJson(editor.document)) {
+        if (!isSupportedDependencyFile(editor.document)) {
             clearAllDecorations(editor);
             return;
         }
@@ -263,11 +386,11 @@ function activate(context) {
         }
     }
     const activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor && isPackageJson(activeEditor.document)) {
+    if (activeEditor && isSupportedDependencyFile(activeEditor.document)) {
         triggerUpdate(activeEditor);
     }
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (editor && isPackageJson(editor.document))
+        if (editor && isSupportedDependencyFile(editor.document))
             triggerUpdate(editor);
         else if (editor)
             clearAllDecorations(editor);
@@ -278,7 +401,7 @@ function activate(context) {
             triggerUpdate(editor, true);
     }));
     context.subscriptions.push(vscode.workspace.onDidOpenTextDocument((doc) => {
-        if (isPackageJson(doc) && vscode.window.activeTextEditor?.document === doc) {
+        if (isSupportedDependencyFile(doc) && vscode.window.activeTextEditor?.document === doc) {
             triggerUpdate(vscode.window.activeTextEditor);
         }
     }));
